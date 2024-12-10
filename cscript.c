@@ -51,22 +51,48 @@ float dot_product(float* v1,float* v2,int s){
     return dot_product_cl(program,queue,context,v1,v2,s);
 }
 
+//Recomendable cuando la matriz es cuadrada
+float** scalar_cuad_mult(float** mat,float scalar,int s1[],int ){
+    float** scalar_mat = make_diag_mat(s1[0],scalar);
+    return matmul(scalar_mat,mat,s1,s1);
+}
+
+float** scalar_mult(float** mat,int size[],float scalar){
+    return scalar_mult_cl(program,queue,context,mat,size,scalar);
+}
+float** Add(float** mat1,float** mat2,int s1[]){
+    return Add_cl(program,queue,context,mat1,mat2,s1,s1);
+}
+
+//Hace el calculo de un modelo lineal
+float** get_linear_m(float** x,float** w,float** b,int n_vars){
+    int dim_w[2] = {n_vars,n_vars};
+    int dim_a[2] = {n_vars,1};
+    float** prod = matmul(w,x,dim_w,dim_a);
+    //float** matad = Add(prod,b,dim_a);
+    return prod;
+}
 
 int main(){
     init_opencl();
 
-    int s1[2] = {4,4};
-    int s2[2] = {4,1};
-    float** mat1 = make_random_matrix(s1,1);
-    float** mat2 = make_random_matrix(s2,1);
+    int s1[2] = {2,2};
+    int s2[2] = {2,1};
+    
+    float xa[] = {10,2};
+    float** x = list2cmatrix(xa,2);
+    float** w = make_random_matrix(s1,0);
+    float** b = list2cmatrix((float[2]){1,1},2);
+    //float** re = get_linear_m(x,w,b,2);
+    
+    show_matrix(w,s1);
+    printf("--------------------\n");
+    show_matrix(x,s2);
+    printf("--------------------\n");
+    show_matrix(b,s2);
+    printf("--------------------\n");
 
-    printf("Primer matriz \n");
-    show_matrix(mat1,s1);
-    printf("Segunda matriz \n");
-    show_matrix(mat2,s2);
-    
-    float** matre = matmul(mat1,mat2,s1,s2);
-    printf("Producto matricial\n");
-    show_matrix(matre,(int[]){s1[0],s2[1]});
-    
+    float** re = matmul(w,x,s1,s2);
+
+    show_matrix(re,s2);
 }

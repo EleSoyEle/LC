@@ -64,6 +64,7 @@ float** oned2twod(float* array,int size,int s[]){
     return new_array;
 }
 
+
 //Se asume que los vectores tienen el mismo tamaño
 float dot_product_cl(cl_program program,cl_command_queue queue,cl_context context,float* v1,float* v2,int s){
     //Pasamos los dos vectores a la memoria del dispositivo
@@ -90,7 +91,6 @@ float dot_product_cl(cl_program program,cl_command_queue queue,cl_context contex
     clReleaseMemObject(buffer_v2);
     clReleaseMemObject(mult_buffer);
     clReleaseKernel(kernel);
-    free(mult_ptr);
     return dot_p;
 }
 
@@ -136,12 +136,13 @@ float** matmul_slow(cl_program program,cl_command_queue queue,cl_context context
 
 //Misma estructura pero el modo de calculo distinto
 cl_int kerr_mat = CL_SUCCESS;
+cl_int error_buffer = CL_SUCCESS;
 float** matmul_cl(cl_program program,cl_command_queue queue,cl_context context,float** mat1,float** mat2,int s1[],int s2[]){
     //Puntero donde vamos a alojar los resultados al final
     //float** matprod = make_zero_mat((float[2]){s1[1],s2[0]});
     float* m1 = twod2oned(mat1,s1);
     float* m2 = twod2oned(mat2,s2);
-    int dim_mat_s = s1[1]*s2[0];
+    int dim_mat_s = s1[0]*s2[1];
     cl_mem mat1_mem = clCreateBuffer(context,CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR,sizeof(float)*s1[0]*s1[1],m1,NULL);
     cl_mem mat2_mem = clCreateBuffer(context,CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR,sizeof(float)*s2[0]*s2[1],m2,NULL);
     cl_mem mat_mul = clCreateBuffer(context,CL_MEM_WRITE_ONLY,sizeof(float)*dim_mat_s,NULL,NULL);
@@ -166,10 +167,14 @@ float** matmul_cl(cl_program program,cl_command_queue queue,cl_context context,f
 
     size_t iters = dim_mat_s;
     clEnqueueNDRangeKernel(queue,kernel,1,NULL,&iters,NULL,0,NULL,NULL);
+    clFinish(queue);
     float* mat_mu_ptr_arr = (float*)calloc(dim_mat_s,sizeof(float));
-    clEnqueueReadBuffer(queue,mat_mul,CL_TRUE,0,sizeof(float)*dim_mat_s,mat_mu_ptr_arr,0,NULL,NULL);
-    float** matmul_re = oned2twod(mat_mu_ptr_arr,dim_mat_s,(int[2]){s1[1],s2[0]});
-    
+    error_buffer = clEnqueueReadBuffer(queue,mat_mul,CL_TRUE,0,sizeof(float)*dim_mat_s,mat_mu_ptr_arr,0,NULL,NULL);
+    if(error_buffer != CL_SUCCESS){
+        printf("Error al leer el buffer");
+    }
+    float** matmul_re = oned2twod(mat_mu_ptr_arr,dim_mat_s,(int[2]){s1[0],s2[1]});
+
     clReleaseKernel(kernel);
     clReleaseMemObject(mat1_mem);
     clReleaseMemObject(mat2_mem);
@@ -178,13 +183,11 @@ float** matmul_cl(cl_program program,cl_command_queue queue,cl_context context,f
     free(m1);
     free(m2);
     return matmul_re;
-
-    
 }
 //Sin probar, seguramente no funciona
 //Ya funciona y fue probada, dejo el comentario anterior para recordarlo con amor
 cl_int kerr = CL_SUCCESS;
-float** add(cl_program program,cl_command_queue queue,cl_context context,float** mat1, float** mat2, int s1[],int s2[]){
+float** Add_cl(cl_program program,cl_command_queue queue,cl_context context,float** mat1, float** mat2, int s1[],int s2[]){
 
     float* m1 = twod2oned(mat1,s1);
     float* m2 = twod2oned(mat2,s2);
@@ -212,9 +215,6 @@ float** add(cl_program program,cl_command_queue queue,cl_context context,float**
     clReleaseMemObject(buff_mat1);
     clReleaseMemObject(buff_mat2);
     clReleaseMemObject(buff_madd);
-    free(added_arr);
-    free(m1);
-    free(m2);
     return added_mat;
 
 }
@@ -228,6 +228,14 @@ float** make_identity(int dim){
     return I;
 }
 
+float** make_diag_mat(int dim,float scalar){
+    float** I = (float**)calloc(dim,sizeof(float*));
+    for(int i=0;i<dim;i++){
+        I[i] = (float*)calloc(dim,sizeof(float));
+        I[i][i]=scalar;
+    }
+    return I;
+}
 
 
 //0:Distribucion uniforme
@@ -252,4 +260,45 @@ float** make_random_matrix(int dim[2],int mode){
         }
     }
     return rand_matrix;
+}
+
+
+
+float* list2ptr(float lista[],int size){
+    float* ptr = (float*)calloc(size,sizeof(float));
+    for(int i=0;i<size;i++){
+        ptr[i]=lista[i];
+    }
+    return ptr;
+}
+
+float** list2cmatrix(float lista[],int size){
+    float** matrix = (float**)calloc(size,sizeof(float*));
+    for(int i=0;i<size;i++){
+        float* ptr = (float*)calloc(1,sizeof(float));
+        ptr[0] = lista[i];
+        matrix[i]=ptr;
+    }
+    return matrix;
+}
+
+
+float** scalar_mult_cl(cl_program program,cl_command_queue queue,cl_context context,float** mat,int size[],float scalar){
+    float* m1 = twod2oned(mat,size);
+    int dim_mat = size[0]*size[1];
+    cl_mem buff1 = clCreateBuffer(context,CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR,sizeof(float)*dim_mat,m1,NULL);
+    cl_mem buff2 = clCreateBuffer(context,CL_MEM_WRITE_ONLY,sizeof(float)*size[0]*size[1],NULL,NULL);
+    
+    cl_kernel kernel = clCreateKernel(program,"SMult",NULL);
+
+    clSetKernelArg(kernel,0,sizeof(cl_mem),(void*)&buff1);
+    clSetKernelArg(kernel,1,sizeof(cl_mem),(void*)&buff2);
+    clSetKernelArg(kernel,2,sizeof(cl_float),&scalar);
+
+    size_t calc_size = size[0]*size[1];
+    clEnqueueNDRangeKernel(queue,kernel,1,NULL,&calc_size,NULL,0,NULL,NULL);
+    float* scalar_mult_1d = (float*)calloc(dim_mat,sizeof(float));
+    clEnqueueReadBuffer(queue,buff2,CL_TRUE,0,sizeof(float)*dim_mat,scalar_mult_1d,0,NULL,NULL);
+    float** scalar_mult_2d = oned2twod(scalar_mult_1d,dim_mat,size);
+    return scalar_mult_2d;
 }

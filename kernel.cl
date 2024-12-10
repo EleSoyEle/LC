@@ -23,26 +23,36 @@ __kernel void MatMul(
     int n = s1col; //Numero comun de filas y columnas
     
     int filas = s1fil;
-    int columnas = s2fil;
+    int columnas = s2col;
     float s = 0;
     int j = gid%columnas;
-    int i = (gid-j)/filas;
+    int i = (gid-j)/columnas;
     
     
     for(int k=0;k<n;k++){
-        s += mat1[(int)s1fil*i+k]*mat2[(int)s2fil*k+j];
+        s += mat1[(int)s1col*i+k]*mat2[(int)s2col*k+j];
     }
     
     matmul_re[gid]=s;
 }
 
 __kernel void AddMat(
-        __global float* mat1,
-        __global float* mat2,
-        __global float* madd){
-    
+    __global float* mat1,
+    __global float* mat2,
+    __global float* madd){
+
+
     int gid = get_global_id(0);
     madd[gid] = mat1[gid]+mat2[gid];
     
 
 }
+
+__kernel void SMult(
+    __global float* mat,
+    __global float* omat,
+    __const float scalar){
+
+    int gid = get_global_id(0);
+    omat[gid] = scalar*mat[gid];
+    }
