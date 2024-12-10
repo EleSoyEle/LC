@@ -9,10 +9,17 @@
 #include "utils.c"
 
 
-
 cl_int qerror = CL_SUCCESS;
 cl_int cerror = CL_SUCCESS;
-int main(){
+
+
+cl_context context;
+cl_command_queue queue;
+cl_program program;
+cl_kernel kernel;
+cl_device_type devt;
+
+int init_opencl(){
     const char* KernelSource = readTextFile("kernel.cl");
     const cl_uint num = 1;
     cl_device_type devt = CL_DEVICE_TYPE_CPU;
@@ -20,36 +27,46 @@ int main(){
     cl_device_id devices[1];
     clGetDeviceIDs(NULL,devt,num,devices,NULL);
 
-    cl_context context = clCreateContextFromType(NULL,devt,NULL,NULL,&cerror);
+    context = clCreateContextFromType(NULL,devt,NULL,NULL,&cerror);
     if(cerror != CL_SUCCESS){
         printf("Error en el context \n");
     }
     clGetDeviceIDs(NULL,devt,1,devices,NULL);
 
-    cl_command_queue queue = clCreateCommandQueueWithProperties(context,devices[0],NULL,&qerror);
+    queue = clCreateCommandQueueWithProperties(context,devices[0],NULL,&qerror);
     if(qerror != CL_SUCCESS){
         printf("Error en el comand queue \n");
     }
-    cl_program program = clCreateProgramWithSource(context,1,(const char**)&KernelSource,NULL,NULL);
+    program = clCreateProgramWithSource(context,1,(const char**)&KernelSource,NULL,NULL);
     clBuildProgram(program,num,devices,NULL,NULL,NULL);
+    return 0;
+}
 
-    int s1[2] = {1000,1000};
-    int s2[2] = {1000,1000};
+//Funcion para no tener que estar pasando constantemente el kernel y el programa
+float** matmul(float** mat1,float** mat2,int s1[],int s2[]){
+    return matmul_cl(program,queue,context,mat1,mat2,s1,s2);
+}
+
+float dot_product(float* v1,float* v2,int s){
+    return dot_product_cl(program,queue,context,v1,v2,s);
+}
+
+
+int main(){
+    init_opencl();
+
+    int s1[2] = {4,4};
+    int s2[2] = {4,1};
     float** mat1 = make_random_matrix(s1,1);
     float** mat2 = make_random_matrix(s2,1);
-    /*
-    float** mat1 = make_zero_mat(s1);
-    float** mat2 = make_zero_mat(s2);
-    mat1[0][0]=-1;
-    mat1[1][1]=-1;
-    
-    mat2[0][0]=-1;
-    mat2[0][1]=5;
-    mat2[1][0]=2;
-    mat2[1][1]=1;
-    */
-    //show_matrix(mat2,s2);
-    float** mat_mult = matmul_v2(program,queue,context,mat1,mat2,s1,s2);
-    //show_matrix(mat_mult,s1);
 
+    printf("Primer matriz \n");
+    show_matrix(mat1,s1);
+    printf("Segunda matriz \n");
+    show_matrix(mat2,s2);
+    
+    float** matre = matmul(mat1,mat2,s1,s2);
+    printf("Producto matricial\n");
+    show_matrix(matre,(int[]){s1[0],s2[1]});
+    
 }

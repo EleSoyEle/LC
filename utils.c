@@ -65,7 +65,7 @@ float** oned2twod(float* array,int size,int s[]){
 }
 
 //Se asume que los vectores tienen el mismo tamaño
-float dot_product(cl_program program,cl_command_queue queue,cl_context context,float* v1,float* v2,int s){
+float dot_product_cl(cl_program program,cl_command_queue queue,cl_context context,float* v1,float* v2,int s){
     //Pasamos los dos vectores a la memoria del dispositivo
     cl_mem buffer_v1 = clCreateBuffer(context,CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR,sizeof(float)*s,v1,NULL);
     cl_mem buffer_v2 = clCreateBuffer(context,CL_MEM_READ_ONLY|CL_MEM_COPY_HOST_PTR,sizeof(float)*s,v2,NULL);
@@ -119,14 +119,16 @@ float** make_zero_mat(int dim[]){
 
 
 
+//Esta fue la primer implementacion de un producto matricial
+//Esmuy lento, lo dejo para recordarlo con amor
 //s1:[m,k], s2:[j,n] ---> s1xs2:[m,n]
-float** matmul(cl_program program,cl_command_queue queue,cl_context context,float** mat1,float** mat2,int s1[],int s2[]){
+float** matmul_slow(cl_program program,cl_command_queue queue,cl_context context,float** mat1,float** mat2,int s1[],int s2[]){
     float** matprod = (float**)calloc(s1[0],sizeof(float*));
     float** mat_transp = Tmat(mat2,s2);
     for(int i=0;i<s1[0];i++){
         matprod[i] = (float*)calloc(s2[1],sizeof(float));
         for(int j=0;j<s2[1];j++){
-            matprod[i][j] = dot_product(program,queue,context,mat1[i],mat_transp[j],s1[1]);
+            matprod[i][j] = dot_product_cl(program,queue,context,mat1[i],mat_transp[j],s1[1]);
         }
     }
     return matprod;
@@ -134,7 +136,7 @@ float** matmul(cl_program program,cl_command_queue queue,cl_context context,floa
 
 //Misma estructura pero el modo de calculo distinto
 cl_int kerr_mat = CL_SUCCESS;
-float** matmul_v2(cl_program program,cl_command_queue queue,cl_context context,float** mat1,float** mat2,int s1[],int s2[]){
+float** matmul_cl(cl_program program,cl_command_queue queue,cl_context context,float** mat1,float** mat2,int s1[],int s2[]){
     //Puntero donde vamos a alojar los resultados al final
     //float** matprod = make_zero_mat((float[2]){s1[1],s2[0]});
     float* m1 = twod2oned(mat1,s1);
