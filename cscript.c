@@ -52,11 +52,12 @@ float dot_product(float* v1,float* v2,int s){
 }
 
 //Recomendable cuando la matriz es cuadrada
-float** scalar_cuad_mult(float** mat,float scalar,int s1[],int ){
+float** scalar_cuad_mult(float** mat,float scalar,int s1[]){
     float** scalar_mat = make_diag_mat(s1[0],scalar);
     return matmul(scalar_mat,mat,s1,s1);
 }
 
+//Multiplicacion por escalar(en general)
 float** scalar_mult(float** mat,int size[],float scalar){
     return scalar_mult_cl(program,queue,context,mat,size,scalar);
 }
@@ -64,14 +65,29 @@ float** Add(float** mat1,float** mat2,int s1[]){
     return Add_cl(program,queue,context,mat1,mat2,s1,s1);
 }
 
+//Atensor porque yo lo hice, 
+struct ATensor{
+    float** y; //Valor Yi de salida
+    float** dy; //Derivada de Yi con respecto a wij
+};
+
 //Hace el calculo de un modelo lineal
-float** get_linear_m(float** x,float** w,float** b,int n_vars){
+struct ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
     int dim_w[2] = {n_vars,n_vars};
     int dim_a[2] = {n_vars,1};
     float** prod = matmul(w,x,dim_w,dim_a);
-    //float** matad = Add(prod,b,dim_a);
-    return prod;
+    float** matad = Add(prod,b,dim_a);
+    float** grads = make_zero_mat(dim_w);
+    for(int i=0;i<n_vars;i++){
+        for(int j=0;j<n_vars;j++){
+            grads[i][j] = x[j][0];
+        }
+    }
+    struct ATensor output={matad,grads}; //Asignamos los valores
+    return output;
 }
+
+
 
 int main(){
     init_opencl();
@@ -82,17 +98,14 @@ int main(){
     float xa[] = {10,2};
     float** x = list2cmatrix(xa,2);
     float** w = make_random_matrix(s1,0);
-    float** b = list2cmatrix((float[2]){1,1},2);
-    //float** re = get_linear_m(x,w,b,2);
-    
-    show_matrix(w,s1);
-    printf("--------------------\n");
-    show_matrix(x,s2);
-    printf("--------------------\n");
-    show_matrix(b,s2);
-    printf("--------------------\n");
+    float** b = make_random_matrix(s2,1);
 
-    float** re = matmul(w,x,s1,s2);
+    struct ATensor output_model = get_linear_m(x,w,b,2);
+    float** re = output_model.y;
+    float** dre = output_model.dy;
+
 
     show_matrix(re,s2);
+    printf("--------------------------------- \n");
+    show_matrix(dre,s1);
 }
