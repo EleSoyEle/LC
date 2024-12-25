@@ -66,13 +66,32 @@ float** Add(float** mat1,float** mat2,int s1[]){
 }
 
 //Atensor porque yo lo hice, 
-struct ATensor{
+typedef struct{
     float** y; //Valor Yi de salida
     float** dy; //Derivada de Yi con respecto a wij
-};
+    int shape[2]; //Dimension de la matriz Yi
+    int dshape[2]; //Dimension de la matriz de derivadas
+}ATensor;
+
+void show_tensor(ATensor *tensor1){
+    if(tensor1==NULL){
+        printf("Error en el tensor");
+        return;
+    }
+    show_matrix(tensor1->y,tensor1->shape);
+
+}
+
+ATensor make_random_tensor(int size[]){
+    float** rtensor = make_random_matrix(size,1);
+    ATensor ten1 = {rtensor};
+    ten1.shape[0]=size[0];
+    ten1.shape[1]=size[1];
+    return ten1;
+}
 
 //Hace el calculo de un modelo lineal
-struct ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
+ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
     int dim_w[2] = {n_vars,n_vars};
     int dim_a[2] = {n_vars,1};
     float** prod = matmul(w,x,dim_w,dim_a);
@@ -83,7 +102,11 @@ struct ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
             grads[i][j] = x[j][0];
         }
     }
-    struct ATensor output={matad,grads}; //Asignamos los valores
+    ATensor output={matad,grads}; //Asignamos los valores
+    output.shape[0] = dim_a[0];
+    output.shape[1] = dim_a[1];
+    output.dshape[0] = dim_w[0];
+    output.dshape[1] = dim_w[1];
     return output;
 }
 
@@ -92,20 +115,14 @@ struct ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
 int main(){
     init_opencl();
 
-    int s1[2] = {2,2};
-    int s2[2] = {2,1};
+    int s1[2] = {100,100};
+    int s2[2] = {100,1};
     
     float xa[] = {10,2};
     float** x = list2cmatrix(xa,2);
     float** w = make_random_matrix(s1,0);
     float** b = make_random_matrix(s2,1);
-
-    struct ATensor output_model = get_linear_m(x,w,b,2);
-    float** re = output_model.y;
-    float** dre = output_model.dy;
-
-
-    show_matrix(re,s2);
-    printf("--------------------------------- \n");
-    show_matrix(dre,s1);
+    printf("Matrices generadas \n");
+    ATensor output_model = get_linear_m(x,w,b,2);
+    show_tensor(&output_model);
 }
