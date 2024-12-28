@@ -6,6 +6,8 @@
 #include <CL/cl.h>
 #include <CL/opencl.h>
 #include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 
 char* readTextFile(char filename[]){
     FILE* file = fopen(filename,"r");
@@ -238,10 +240,63 @@ float** make_diag_mat(int dim,float scalar){
 }
 
 
-//0:Distribucion uniforme
-//1:Distribucion normal
+typedef struct{
+    int mode;
+    float** rand_array;
+    int d1;
+    int d2;
+    int id;
+}ThreadRandomData;
+
+
 #define sqpi sqrt(2*CL_M_1_PI)
 #define PI 3.1415926535
+void* MakeRandomList(void* vargp){
+    ThreadRandomData* data_ac = (ThreadRandomData*)vargp;
+    int mode = data_ac->mode;
+    int myid = data_ac->id;
+    int d1 = data_ac->d1;
+    int d2 = data_ac->d2;
+
+    data_ac->rand_array[myid] = (float*)calloc(d2,sizeof(float));
+    for(int i=0;i<d2;i++){
+        float rv = (float)rand()/(float)(RAND_MAX);
+        if(mode==1){
+            float rv2 = (float)rand()/(float)(RAND_MAX);
+            //Esta formula nos permite pasar de una distribucion uniforme a una normal
+            float z1 = sqrt(-2*log(rv))*cos(2*PI*rv2);
+            rv = z1;
+        }
+        data_ac->rand_array[myid][i]=rv;
+    }
+}
+
+float** make_random_matrix_th(int dim[2],int mode){
+    float** rand_matrix = (float**)calloc(dim[0],sizeof(float*));
+    srand((unsigned int)time(NULL));
+    pthread_t threads[dim[0]];
+
+    
+    for(int i=0;i<dim[0];i++){
+        ThreadRandomData* data = malloc(sizeof(ThreadRandomData));
+        data->mode = mode;
+        data->d1 = dim[0];
+        data->d2 = dim[1];
+        data->rand_array = rand_matrix;        
+        data->id = i;
+        pthread_create(&threads[i],NULL,MakeRandomList,(void *)data);
+
+    }
+    for(int i=0;i<dim[0];i++){
+        pthread_join(threads[i],NULL);
+    }
+    
+    return rand_matrix;
+}
+
+
+//0:Distribucion uniforme
+//1:Distribucion normal
 float** make_random_matrix(int dim[2],int mode){
     float** rand_matrix = (float**)calloc(dim[0],sizeof(float*));
     srand((unsigned int)time(NULL));

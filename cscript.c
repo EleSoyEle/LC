@@ -69,13 +69,18 @@ float** Add(float** mat1,float** mat2,int s1[]){
 typedef struct{
     float** y; //Valor Yi de salida
     float** dy; //Derivada de Yi con respecto a wij
-    int shape[2]; //Dimension de la matriz Yi
-    int dshape[2]; //Dimension de la matriz de derivadas
+    int shape[5]; //Dimension de la matriz Yi
+    int dshape[5]; //Dimension de la matriz de derivadas
+    int rank;
 }ATensor;
 
 void show_tensor(ATensor *tensor1){
     if(tensor1==NULL){
-        printf("Error en el tensor");
+        printf("Error en el tensor \n");
+        return;
+    }
+    if(tensor1->rank != 2){
+        printf("El rango debe ser 2 \n");
         return;
     }
     show_matrix(tensor1->y,tensor1->shape);
@@ -87,6 +92,7 @@ ATensor make_random_tensor(int size[]){
     ATensor ten1 = {rtensor};
     ten1.shape[0]=size[0];
     ten1.shape[1]=size[1];
+    ten1.rank=2;
     return ten1;
 }
 
@@ -110,19 +116,41 @@ ATensor get_linear_m(float** x,float** w,float** b,int n_vars){
     return output;
 }
 
+//Sin paralelizar todavia
+ATensor MeanSquaredError(ATensor* y_real, ATensor* y_fake){
+    float** p_yreal = y_real->y;
+    float** p_yfake = y_fake->y;
+    
+    //Error acumulado en cada batch, se va a promediar
+    float* ac_loss = (float*)calloc(y_real->shape[0],sizeof(float));
+    
+    //Iteramos sobre cada batch
+    for(int i=0;i<y_real->shape[0];i++){
+        float loss_batch = 0;
+        //Debemos iterar sobre cada elemento del batch
+        for(int j=0;i<y_real->shape[1];i++){
+            loss_batch += pow(p_yreal[i][j]-p_yfake[i][j],2);
+        }
+        ac_loss[i] = loss_batch;
+    }
+}
 
 
 int main(){
     init_opencl();
 
-    int s1[2] = {100,100};
+    int s1[2] = {2000,2000};
     int s2[2] = {100,1};
     
-    float xa[] = {10,2};
-    float** x = list2cmatrix(xa,2);
-    float** w = make_random_matrix(s1,0);
-    float** b = make_random_matrix(s2,1);
-    printf("Matrices generadas \n");
-    ATensor output_model = get_linear_m(x,w,b,2);
-    show_tensor(&output_model);
+
+    //float xa[] = {10,2};
+    //float** x = list2cmatrix(xa,2);
+    //float** w = make_random_matrix(s1,0);
+    //float** b = make_random_matrix(s2,1);
+    //printf("Matrices generadas \n");
+    //ATensor output_model = get_linear_m(x,w,b,2);
+    //show_tensor(&output_model);
+
+    float** w = make_random_matrix_th(s1,1);
+    show_matrix(w,s1);
 }
